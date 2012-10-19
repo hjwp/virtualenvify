@@ -88,12 +88,42 @@ def get_imported_packages(target_directory):
     return imports - std_lib - user_modules
 
 
+def build_virtualenv(target_directory):
+    subprocess.check_call(['virtualenv', '--no-site-packages', target_directory ])
+
+def install_packages(target_directory, packages):
+    subprocess.check_call([os.path.join(target_directory, 'bin', 'pip'), 'install'] + list(packages))
+
+
+def update_wsgi(target_directory):
+    full_path = os.path.abspath(target_directory)
+    activate_path = os.path.join(full_path, 'bin', 'activate_this.py')
+    activation_code = dedent(
+        """
+        # This activates the virtualenv for your web app
+        activate_this = %r
+        execfile(activate_this, dict(__file__=activate_this))
+        """ % (activate_path,)
+    )
+    with open('/var/www/wsgi.py') as f:
+        old_contents = f.read()
+    if not old_contents.startswith(activation_code):
+        with open('/var/www/wsgi.py', 'w') as f:
+            f.write(activation_code + old_contents)
+
+
+
 def main(target_directory):
     imported_packages = get_imported_packages(target_directory)
     print "The following external package import have been detected:"
     print "\n".join(imported_packages)
     print "I will try and install these into your virtualenv"
-    print debug_modules
+    print 'building virtualenv'
+    build_virtualenv(target_directory)
+    print 'installing packages'
+    install_packages(target_directory, imported_packages)
+    print 'updating wsgi file'
+    update_wsgi(target_directory)
 
 
 if __name__ == '__main__':
