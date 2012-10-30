@@ -29,6 +29,9 @@ import sys
 import subprocess
 from textwrap import dedent
 
+class NoSuchPackageException(Exception):
+    pass
+
 
 def get_batteries_included():
     old_stdout, old_stderr = sys.stdout, sys.stderr
@@ -119,6 +122,10 @@ def build_virtualenv(target_directory, fake):
     else:
         print 'Building virtualenv in', target_directory
         subprocess.check_call(commands)
+
+
+def pip_install_package(package_name, target_directory):
+    pass
 
 
 def install_packages(target_directory, packages):
