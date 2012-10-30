@@ -33,9 +33,10 @@ class PackageInstallingTests(unittest.TestCase):
 
     def test_pip_install_package_for_known_package(self):
         pip_install_package('virtualenvify', self.tempdir)
-        self.assertTrue(os.path.exists(
-            os.path.join(self.tempdir, 'lib', 'python2.7', 'site-packages', 'virtualenvify')
-        ))
+        self.assertIn(
+            'virtualenvify.py',
+            os.listdir(os.path.join(self.tempdir, 'bin'))
+        )
 
 
     def test_pip_install_package_for_unknown_package(self):
@@ -45,9 +46,12 @@ class PackageInstallingTests(unittest.TestCase):
 
     def test_pip_install_package_for_compilation_required_falls_back_to_copying_our_version(self):
         pip_install_package('fiona', self.tempdir)
-        self.assertTrue(os.path.exists(
-            os.path.join(self.tempdir, 'lib', 'python2.7', 'site-packages', 'fiona')
-        ))
+        self.assertIn(
+            'fiona',
+            os.listdir(
+                os.path.join(self.tempdir, 'lib', 'python2.7', 'site-packages')
+            )
+        )
         _, path_to_our_version, __ = imp.load_module('fiona')
         for filename in os.listdir(path_to_our_version):
             if filename.endswith('.py') or filename.endswith('.so'):

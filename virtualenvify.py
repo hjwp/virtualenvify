@@ -125,7 +125,26 @@ def build_virtualenv(target_directory, fake):
 
 
 def pip_install_package(package_name, target_directory):
-    pass
+    commands =  [
+            os.path.join(target_directory, 'bin', 'pip'),
+            'install', package_name
+    ]
+    p = subprocess.Popen(commands, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p.wait()
+    stdout = p.stdout.read()
+
+    msg_success = "Successfully installed %s" % package_name
+    msg_not_found = "No distributions at all found for %s" % package_name
+    msg_compile_failure = "error: command 'gcc' failed with exit status 1"
+    if msg_success in stdout:
+        print stdout
+        return
+    if msg_not_found in stdout:
+        print stdout
+        raise NoSuchPackageException('Could not install doesnotexist')
+    if msg_compile_failure in stdout:
+        print stdout
+        raise Exception('compile failure')
 
 
 def install_packages(target_directory, packages):
