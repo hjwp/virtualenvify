@@ -1,8 +1,23 @@
 """Harry's webapp-virtualenvifier
 
+This program attempts to "virtualenv-ify" an existing Python project, by:
+- scanning its source tree for imports
+- creating a virtualenv in its project root
+- pip installing any detected dependencies into the virtualenv
+- modifying the file at /var/www/wsgi.py to activate the virtualenv
+
 Usage:
-    virtualenvify <target_directory>
+    virtualenvify <target_directory> [--no-wsgi] [--fake]
+    virtualenvify -h | --help
+
+Options:
+    -h --help   show this screen
+    --fake      preview changes only, do not write anything to disk. [default: False]
+    --no-wsgi   for non-web-apps, do not touch wsgi.py. [default: False]
+
 """
+
+from datetime import datetime
 from distutils import sysconfig
 from docopt import docopt
 import imp
@@ -11,6 +26,7 @@ from pprint import pprint
 import os
 from StringIO import StringIO
 import re
+import shutil
 import sys
 import subprocess
 from textwrap import dedent
@@ -88,14 +104,22 @@ def get_imported_packages(target_directory):
     return imports - std_lib - user_modules
 
 
-def build_virtualenv(target_directory):
-    subprocess.check_call(['virtualenv', '--no-site-packages', target_directory ])
+def build_virtualenv(target_directory, fake):
+    commands = ['virtualenv', '--no-site-packages', target_directory ]
+    if fake:
+        print 'Virtualenv command-line would be:'
+        print ' '.join(commands)
+    else:
+        print 'Building virtualenv in', target_directory
+        subprocess.check_call(commands)
+
 
 def install_packages(target_directory, packages):
+    print 'Installing dependencies into virtualenv'
     subprocess.check_call([os.path.join(target_directory, 'bin', 'pip'), 'install'] + list(packages))
 
 
-def update_wsgi(target_directory):
+def update_wsgi(target_directory, fake):
     full_path = os.path.abspath(target_directory)
     activate_path = os.path.join(full_path, 'bin', 'activate_this.py')
     activation_code = dedent(
@@ -107,28 +131,45 @@ def update_wsgi(target_directory):
     )
     with open('/var/www/wsgi.py') as f:
         old_contents = f.read()
-    if not old_contents.startswith(activation_code):
-        with open('/var/www/wsgi.py', 'w') as f:
-            f.write(activation_code + old_contents)
+
+    if old_contents.startswith(activation_code):
+        print 'activation code already found in WSGI file'
+        return
+
+    new_contents = activation_code + old_contents
+    if fake:
+        print 'new wsgi file contents would be:'
+        print new_contents
+        return
+
+    print 'backing up old wsgi file'
+    shutil.copy('/var/www/wsgi.py', 'var/www/wsgi.py.%s.bak' % (datetime.utcnow().strftime('%Y-%m-%d-%H-%M'),))
+    print 'updating wsgi file'
+    with open('/var/www/wsgi.py', 'w') as f:
+        f.write(activation_code + old_contents)
 
 
 
-def main(target_directory):
+def main(args):
+    target_directory = args['<target_directory>']
     imported_packages = get_imported_packages(target_directory)
     print "The following external package import have been detected:"
     print "\n".join(imported_packages)
-    print "I will try and install these into your virtualenv"
-    print 'building virtualenv'
-    build_virtualenv(target_directory)
-    print 'installing packages'
-    install_packages(target_directory, imported_packages)
-    print 'updating wsgi file'
-    update_wsgi(target_directory)
+
+    build_virtualenv(target_directory, args['--fake'])
+
+    if not args['--fake']:
+        install_packages(args, imported_packages)
+
+    if not args['--no-wsgi']:
+        update_wsgi(target_directory, args['--fake'])
 
 
 if __name__ == '__main__':
     args = docopt(__doc__)
-    main(args['<target_directory>'])
+    main(args)
+
+
 
 class VirtualenvifyTests(TestCase):
 
@@ -271,9 +312,13 @@ class VirtualenvifyTests(TestCase):
         self.assertNotIn(',', ''.join(packages))
         self.assertNotIn(';', ''.join(packages))
         self.assertNotIn('\\', ''.join(packages))
+        self.assertNotIn('sys', packages)
         for p in packages:
             if p not in ('PyObjCTools', 'Foundation', 'AppKit', 'fltk', 'gtk', 'gobject', 'pango', '_tkagg', 'wx'): # not installed
                 f, pathname, desc = imp.find_module(p)
                 self.assertIn('site-packages', pathname)
                 self.assertNotIn('matplotlib', pathname)
 
+
+    def test_against_firstlaw_data(self):
+        self.fail('todo - shows sys whenit shouldnt')
