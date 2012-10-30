@@ -81,7 +81,10 @@ class ImportFindingTests(unittest.TestCase):
 
 
     def test_get_imported_packages(self):
-        _, path_to_matplotlib, __ = imp.find_module('matplotlib')
+        try:
+            _, path_to_matplotlib, __ = imp.find_module('matplotlib')
+        except ImportError:
+            raise Warning('Could not import Matplotlib - unable to run this test')
         packages = get_imported_packages(path_to_matplotlib)
         #pprint(debug_modules)
         self.assertNotIn(',', ''.join(packages))
