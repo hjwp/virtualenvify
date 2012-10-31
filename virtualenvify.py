@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """Harry's webapp-virtualenvifier
 
 This program attempts to "virtualenv-ify" an existing Python project, by:
