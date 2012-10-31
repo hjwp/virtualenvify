@@ -67,8 +67,19 @@ class PackageInstallingTests(unittest.TestCase):
                 ))
 
 
+    def test_pip_install_package_with_copy_local_option_and_single_file_package(self):
+        response = pip_install_package('argparse', self.tempdir, copy_local=True)
+        self.assertIn(
+            'argparse.py',
+            os.listdir(
+                os.path.join(self.tempdir, 'lib', 'python2.7', 'site-packages')
+            )
+        )
+        self.assertEqual(response, 'copied from existing installation')
+
+
     def test_install_packages_does_them_sequentially_catches_errors_and_returns_report(self):
-        report = install_packages(['aafigure', 'doesnotexist', 'psutil'], self.tempdir)
+        report = install_packages(['aafigure', 'doesnotexist', 'psutil'], self.tempdir, False)
         self.assertEqual(report,
                 'Package installation report:\n'
                 'aafigure: installed successfully\n'

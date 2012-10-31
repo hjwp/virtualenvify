@@ -7,13 +7,19 @@ This program attempts to "virtualenv-ify" an existing Python project, by:
 - modifying the file at /var/www/wsgi.py to activate the virtualenv
 
 Usage:
-    virtualenvify <target_directory> [--no-wsgi] [--fake]
+    virtualenvify <target_directory> [--update-wsgi]
+                                     [--always-copy-local]
+                                     [--fake]
     virtualenvify -h | --help
 
 Options:
-    -h --help   show this screen
-    --fake      preview changes only, do not write anything to disk. [default: False]
-    --no-wsgi   for non-web-apps, do not touch wsgi.py. [default: False]
+    -h --help            show this screen
+    --fake               preview only, do not write anything to disk.
+                         [default: False]
+    --update-wsgi        for web apps, update /var/www/wsgi.py with
+                         virtualenv activation code [default: False]
+    --always-copy-local  always copy locally installed version of
+                         packages [default: False]
 
 """
 
@@ -127,18 +133,33 @@ def build_virtualenv(target_directory, fake):
 
 def copy_package_from_existing_install(package_name, target_directory):
     #TODO: improve this to catch anything in /usr/local/bin
-    dest = os.path.join(target_directory, 'lib', 'python2.7', 'site-packages', package_name)
-    _, installed_dir, __ = imp.find_module(package_name)
-    print 'copying from', installed_dir, 'to', dest
-    shutil.copytree(installed_dir, dest)
+    _, installed_location, __ = imp.find_module(package_name)
+    venv_site_packages = os.path.join(
+        target_directory, 'lib', 'python2.7', 'site-packages'
+    )
+    if os.path.isdir(installed_location):
+        dest = os.path.join(venv_site_packages, package_name)
+        print 'copying from', installed_location, 'to', dest
+        shutil.copytree(installed_location, dest)
+    else:
+        dest = os.path.join(venv_site_packages, os.path.basename(installed_location))
+        print 'copying from', installed_location, 'to', dest
+        shutil.copy(installed_location, dest)
 
 
-def pip_install_package(package_name, target_directory):
-    commands =  [
+
+def pip_install_package(package_name, target_directory, copy_local=False):
+    if copy_local:
+        copy_package_from_existing_install(package_name, target_directory)
+        return 'copied from existing installation'
+
+    p = subprocess.Popen(
+        [
             os.path.join(target_directory, 'bin', 'pip'),
             'install', package_name
-    ]
-    p = subprocess.Popen(commands, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        ],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
     p.wait()
     stdout = p.stdout.read()
 
@@ -157,11 +178,11 @@ def pip_install_package(package_name, target_directory):
         return 'copied from existing installation'
 
 
-def install_packages(packages, target_directory):
+def install_packages(packages, target_directory, copy_local):
     print 'Installing dependencies into virtualenv'
     report = 'Package installation report:\n'
     for package in packages:
-        response = pip_install_package(package, target_directory)
+        response = pip_install_package(package, target_directory, copy_local)
         report += "%s: %s\n" % (package, response)
     return report
 
@@ -213,9 +234,12 @@ def main(args):
 
     report = None
     if not args['--fake']:
-        report = install_packages(imported_packages, target_directory)
+        report = install_packages(
+            imported_packages, target_directory,
+            args['--always-copy-local']
+        )
 
-    if not args['--no-wsgi']:
+    if args['--update-wsgi']:
         update_wsgi(target_directory, args['--fake'])
 
     if report is not None:
