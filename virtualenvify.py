@@ -147,18 +147,23 @@ def pip_install_package(package_name, target_directory):
     msg_compile_failure = "error: command 'gcc' failed with exit status 1"
     if msg_success in stdout:
         print stdout
-        return
+        return 'installed successfully'
     if msg_not_found in stdout:
         print stdout
-        raise NoSuchPackageException('Could not install doesnotexist')
+        return 'could not install'
     if msg_compile_failure in stdout:
         print 'This package requires compilation. Attempting to copy existing version'
         copy_package_from_existing_install(package_name, target_directory)
+        return 'copied from existing installation'
 
 
-def install_packages(target_directory, packages):
+def install_packages(packages, target_directory):
     print 'Installing dependencies into virtualenv'
-    subprocess.check_call([os.path.join(target_directory, 'bin', 'pip'), 'install'] + list(packages))
+    report = 'Package installation report:\n'
+    for package in packages:
+        response = pip_install_package(package, target_directory)
+        report += "%s: %s\n" % (package, response)
+    return report
 
 
 def update_wsgi(target_directory, fake):
@@ -185,10 +190,16 @@ def update_wsgi(target_directory, fake):
         return
 
     print 'backing up old wsgi file'
-    shutil.copy('/var/www/wsgi.py', 'var/www/wsgi.py.%s.bak' % (datetime.utcnow().strftime('%Y-%m-%d-%H-%M'),))
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d-%H-%M')
+    shutil.copy(
+        '/var/www/wsgi.py',
+        '/var/www/wsgi.py.%s.bak' % (timestamp,)
+    )
     print 'updating wsgi file'
     with open('/var/www/wsgi.py', 'w') as f:
-        f.write(activation_code + old_contents)
+        f.write(new_contents)
+    print 'wsgi file updated to:'
+    print new_contents
 
 
 
@@ -200,11 +211,15 @@ def main(args):
 
     build_virtualenv(target_directory, args['--fake'])
 
+    report = None
     if not args['--fake']:
-        install_packages(target_directory, imported_packages)
+        report = install_packages(imported_packages, target_directory)
 
     if not args['--no-wsgi']:
         update_wsgi(target_directory, args['--fake'])
+
+    if report is not None:
+        print report
 
 
 if __name__ == '__main__':

@@ -16,6 +16,7 @@ from virtualenvify import (
         get_standard_library,
         get_imports,
         get_imported_packages,
+        install_packages,
         pip_install_package,
 )
 
@@ -32,26 +33,32 @@ class PackageInstallingTests(unittest.TestCase):
 
 
     def test_pip_install_package_for_known_package(self):
-        pip_install_package('virtualenvify', self.tempdir)
+        response = pip_install_package('virtualenvify', self.tempdir)
         self.assertIn(
             'virtualenvify.py',
             os.listdir(os.path.join(self.tempdir, 'bin'))
         )
+        self.assertEqual(response, 'installed successfully')
 
 
     def test_pip_install_package_for_unknown_package(self):
-        with self.assertRaises(NoSuchPackageException):
-            pip_install_package('doesnotexist', self.tempdir)
+        response = pip_install_package('doesnotexist', self.tempdir)
+        self.assertNotIn(
+            'doesnotexist',
+            os.listdir(os.path.join(self.tempdir, 'bin'))
+        )
+        self.assertEqual(response, 'could not install')
 
 
     def test_pip_install_package_for_compilation_required_falls_back_to_copying_our_version(self):
-        pip_install_package('fiona', self.tempdir)
+        response = pip_install_package('fiona', self.tempdir)
         self.assertIn(
             'fiona',
             os.listdir(
                 os.path.join(self.tempdir, 'lib', 'python2.7', 'site-packages')
             )
         )
+        self.assertEqual(response, 'copied from existing installation')
         _, path_to_our_version, __ = imp.find_module('fiona')
         for filename in os.listdir(path_to_our_version):
             if filename.endswith('.py') or filename.endswith('.so'):
@@ -60,10 +67,14 @@ class PackageInstallingTests(unittest.TestCase):
                 ))
 
 
-
-
-    def test_install_packages_does_them_sequentially(self):
-        self.fail()
+    def test_install_packages_does_them_sequentially_catches_errors_and_returns_report(self):
+        report = install_packages(['aafigure', 'doesnotexist', 'psutil'], self.tempdir)
+        self.assertEqual(report,
+                'Package installation report:\n'
+                'aafigure: installed successfully\n'
+                'doesnotexist: could not install\n'
+                'psutil: copied from existing installation\n'
+        )
 
 
 
