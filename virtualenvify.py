@@ -20,6 +20,7 @@ Options:
 from datetime import datetime
 from distutils import sysconfig
 from docopt import docopt
+import imp
 from pip.commands import freeze
 import os
 from StringIO import StringIO
@@ -124,6 +125,14 @@ def build_virtualenv(target_directory, fake):
         subprocess.check_call(commands)
 
 
+def copy_package_from_existing_install(package_name, target_directory):
+    #TODO: improve this to catch anything in /usr/local/bin
+    dest = os.path.join(target_directory, 'lib', 'python2.7', 'site-packages', package_name)
+    _, installed_dir, __ = imp.find_module(package_name)
+    print 'copying from', installed_dir, 'to', dest
+    shutil.copytree(installed_dir, dest)
+
+
 def pip_install_package(package_name, target_directory):
     commands =  [
             os.path.join(target_directory, 'bin', 'pip'),
@@ -143,8 +152,8 @@ def pip_install_package(package_name, target_directory):
         print stdout
         raise NoSuchPackageException('Could not install doesnotexist')
     if msg_compile_failure in stdout:
-        print stdout
-        raise Exception('compile failure')
+        print 'This package requires compilation. Attempting to copy existing version'
+        copy_package_from_existing_install(package_name, target_directory)
 
 
 def install_packages(target_directory, packages):

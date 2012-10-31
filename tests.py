@@ -52,7 +52,7 @@ class PackageInstallingTests(unittest.TestCase):
                 os.path.join(self.tempdir, 'lib', 'python2.7', 'site-packages')
             )
         )
-        _, path_to_our_version, __ = imp.load_module('fiona')
+        _, path_to_our_version, __ = imp.find_module('fiona')
         for filename in os.listdir(path_to_our_version):
             if filename.endswith('.py') or filename.endswith('.so'):
                 self.assertTrue(os.path.exists(
